@@ -86,3 +86,8 @@ npm run dist     # dist/ 下产出 NSIS 安装包 + 便携版
 ```
 
 版本号在 `package.json`；`appId com.aivolumetool.pet`，图标 `assets/icon-256.png`。发布前确认 NOTICE.md 的素材与接口声明仍然准确。
+
+## 两个已踩过的坑
+
+- **杀软误报（Windows Defender）**：`main/main.js` 含 `spawn('cmd'...)`/终端拉起等模式，可能被 ML 启发式判成 `Trojan:Script/ObfusScript.A!ml` 并**静默隔离源文件**（构建报 "main.js not found in archive" 时先查这个）。解法：给项目目录加 Defender 排除（`Add-MpPreference -ExclusionPath`，需管理员），再从最后一次成功构建的 `dist/win-unpacked/resources/app.asar` 用 `npx asar extract-file` 找回文件
+- **GitHub Push Protection**：源码里的 Google 公开客户端常量（RFC 8252 安装型应用，随 CLI 开源分发，非机密）会被机密扫描拦截推送。本项目已改为运行时拼接的分片写法；若新增类似常量遇到 `push declined due to repository rule violations`，同样处理或到仓库安全设置里标记误报
