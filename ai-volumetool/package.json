@@ -17,7 +17,7 @@
   },
   "scripts": {
     "start": "electron .",
-    "dist": "electron-builder --win nsis portable",
+    "dist": "electron-builder --win nsis portable --publish never",
     "mock": "node tools/mock-server.js"
   },
   "devDependencies": {
