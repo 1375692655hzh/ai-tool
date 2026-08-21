@@ -68,7 +68,13 @@ poller.js（定时，默认5分钟）
 无自动化测试框架；采用「mock 服务 + CDP 实测」：
 
 1. **mock 渠道**：`npm run mock` 起 127.0.0.1:4789（new-api 风格计费接口，key `sk-test`），添加渠道填该地址即可离线验证嗅探/显示全链路
-2. **CDP 实测**（本项目所有改动的验证方式）：
+2. **一键回归（推荐）**：`npm run dist` 后执行
+   ```bash
+   node tools/verify.js            # 自动拉起 exe，跑完 6 项断言并退出（0=全过）
+   node tools/verify.js 其他.exe --port=9229
+   ```
+   覆盖：宠物真实渲染（不透明像素）、面板宽度/溢出/高度贴合、渠道轮询、全部角色切换并还原。会先结束已运行的应用实例（单例锁）。需要 Node ≥ 22
+3. **CDP 手测**（verify.js 不够用时）：
    ```bash
    # 用调试端口拉起便携版（端口被占就换一个）
    powershell "Start-Process -FilePath 'dist\AI用量宠物 1.0.0.exe' -ArgumentList '--remote-debugging-port=9224'"
@@ -77,7 +83,7 @@ poller.js（定时，默认5分钟）
    ```
    - 宠物可见性以「`.pet-media` 元素实际不透明像素 > 0」为准，不要只看元素存在
    - 面板高度 = 标题栏 + 正常卡底边（`.card:not(.bad)` 最低一张的 offsetBottom）
-3. **打包回归**：改完必须 `npm run dist` 再测——便携版有解包缓存，运行旧 exe 测的是旧代码
+4. **打包回归**：改完必须 `npm run dist` 再测——便携版有解包缓存，运行旧 exe 测的是旧代码
 
 ## 发布
 
@@ -86,6 +92,16 @@ npm run dist     # dist/ 下产出 NSIS 安装包 + 便携版
 ```
 
 版本号在 `package.json`；`appId com.aivolumetool.pet`，图标 `assets/icon-256.png`。发布前确认 NOTICE.md 的素材与接口声明仍然准确。
+
+**CI 自动构建**（仓库根 `.github/workflows/build.yml`）：
+
+- push 到 main → Windows runner 自动构建，产物存 Actions Artifact（可下载）
+- push tag `v*` → 构建并自动挂到对应 Release——**发新版只需**：
+  ```bash
+  # 改 package.json 的 version 后：
+  git tag v1.0.1 && git push origin main --tags
+  ```
+- 本地 `node tools/verify.js` 做运行时回归，CI 做构建验证，两者互补（GUI 应用没法在 CI 的无头环境里跑真实交互）
 
 ## 两个已踩过的坑
 

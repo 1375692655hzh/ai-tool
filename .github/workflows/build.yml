@@ -1,0 +1,48 @@
+name: build-windows
+
+# push main：只做构建验证（产物存 artifact，不发布）
+# push tag v*：构建并自动挂到对应 Release —— 发版只需 `git tag v1.0.1 && git push --tags`
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: ai-volumetool
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ai-volumetool/package-lock.json
+
+      - name: 安装依赖
+        run: npm install
+
+      - name: 打包（便携版 + NSIS 安装包）
+        env:
+          # CI 上没有本机证书库，禁用自动签名探测
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+        run: npm run dist
+
+      - name: 上传构建产物（每次都能下载）
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-volumetool-win
+          path: ai-volumetool/dist/*.exe
+
+      - name: 挂到 Release（仅 tag 触发）
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ai-volumetool/dist/*.exe
