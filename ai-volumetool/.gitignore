@@ -1,0 +1,16 @@
+# 构建产物与依赖
+node_modules/
+dist/
+package-lock.json.bak
+
+# 运行期生成
+*.log
+
+# 开发过程文件（个人环境相关，不入库）
+test/
+.zcode/
+docs/screenshots/*.backup.png
+
+# 系统杂项
+Thumbs.db
+.DS_Store

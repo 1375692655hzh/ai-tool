@@ -1,0 +1,35 @@
+html, body {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+#pet {
+  position: relative;
+  cursor: grab;
+}
+
+#pet.dragging {
+  cursor: grabbing;
+}
+
+/* 角色媒体元素：canvas / video / img 都由渲染器按角色尺寸设定宽高 */
+.pet-media {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+  object-fit: contain;
+}
+
+/* 静态立绘的呼吸浮动，让画面保持"活着" */
+.pet-media.bob {
+  animation: pet-bob 2.6s ease-in-out infinite;
+}
+@keyframes pet-bob {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-4px); }
+}

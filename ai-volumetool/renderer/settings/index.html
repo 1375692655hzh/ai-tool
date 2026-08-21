@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'" />
+  <link rel="stylesheet" href="settings.css" />
+</head>
+<body>
+  <h2>渠道管理</h2>
+  <div id="channel-list"></div>
+  <button id="btn-add" class="btn secondary">＋ 添加渠道</button>
+
+  <h2>偏好设置</h2>
+  <div class="prefs">
+    <label>角色形象
+      <select id="pet-character"></select>
+    </label>
+    <label>轮询间隔（分钟）
+      <input id="poll-interval" type="number" min="1" step="1" />
+    </label>
+    <label>宠物大小
+      <select id="pet-scale">
+        <option value="1">小（100%）</option>
+        <option value="1.5">中（150%）</option>
+        <option value="2">大（200%）</option>
+      </select>
+    </label>
+    <label class="chk">
+      <input id="auto-start" type="checkbox" /> 开机自启动
+    </label>
+  </div>
+  <div class="prefs tools">
+    <label>启动工具（宠物右键菜单，每行一个：名称 | app或term | 程序路径或命令）
+      <textarea id="launch-tools" rows="7" spellcheck="false" placeholder="VSCode | app | C:\Program Files\Microsoft VS Code\Code.exe&#10;Codex | term | codex"></textarea>
+    </label>
+    <div class="hint">app=直接启动桌面程序；term=在新的终端窗口里运行 CLI 命令。卡片左侧 ↑↓ 可调整渠道在用量面板中的显示顺序</div>
+  </div>
+
+  <div class="footer">
+    <span id="save-tip"></span>
+    <button id="btn-save" class="btn primary">保存</button>
+    <button id="btn-close" class="btn secondary">关闭</button>
+  </div>
+
+  <script src="settings.js"></script>
+</body>
+</html>
