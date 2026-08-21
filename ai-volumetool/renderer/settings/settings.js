@@ -192,7 +192,7 @@
     return {
       id: card.dataset.id,
       vendor: v('vendor'),
-      name: v('name'),
+      name: v('name').trim() || '未命名渠道',
       baseUrl: v('baseUrl'),
       apiKey,
       accessKeyId: v('accessKeyId'),

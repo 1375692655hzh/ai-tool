@@ -7,7 +7,7 @@ function popupPetMenu({
 }) {
   const toolItems = (tools && tools.length)
     ? tools.map((t) => ({ label: t.name, click: () => onLaunchTool(t) }))
-    : [{ label: '（未配置，可在设置里添加）', enabled: false }];
+    : [{ label: '去设置添加…', click: onOpenSettings }];
 
   const charItems = (characters && characters.length
     ? characters
@@ -23,8 +23,8 @@ function popupPetMenu({
     { label: '📊 显示用量', click: onShowUsage },
     { label: '🎭 形象', submenu: charItems },
     { label: '⚙️ 设置', click: onOpenSettings },
-    // 没配置启动工具就不显示这一项，避免新用户点到空菜单
-    ...((tools && tools.length) ? [{ label: '🚀 启动工具', submenu: toolItems }] : []),
+    // 没配置时保留菜单项并引导去设置，让新用户知道有这个功能
+    { label: '🚀 启动工具', submenu: toolItems },
     { type: 'separator' },
     { label: '退出', click: onQuit },
   ]);

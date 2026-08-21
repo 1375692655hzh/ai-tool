@@ -16,6 +16,20 @@
   sizeWindowTo(character, scale);
   let workArea = config.workArea;
 
+  // 首次启动提示：告诉新用户右键有菜单（localStorage 记一次即不再出现）
+  try {
+    if (!localStorage.getItem('hint-rightclick')) {
+      const tip = document.createElement('div');
+      tip.className = 'first-hint';
+      tip.textContent = '👉 右键我';
+      el.appendChild(tip);
+      const dismiss = () => { tip.classList.add('fade'); setTimeout(() => tip.remove(), 700); };
+      setTimeout(dismiss, 9000);
+      el.addEventListener('contextmenu', dismiss, { once: true });
+      localStorage.setItem('hint-rightclick', '1');
+    }
+  } catch { /* localStorage 不可用就算了 */ }
+
   // —— 交互 ——
   let lastActivity = Date.now();
   new window.PetInteraction(el, {

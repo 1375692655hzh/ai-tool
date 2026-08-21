@@ -33,3 +33,21 @@ html, body {
   0%, 100% { transform: translateY(0); }
   50%      { transform: translateY(-4px); }
 }
+
+/* 首次启动的右键提示气泡：窗口与宠物同尺寸，只能贴宠物内部顶部 */
+.first-hint {
+  position: absolute;
+  top: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 96%;
+  padding: 3px 9px;
+  border-radius: 10px;
+  background: rgba(30, 34, 44, 0.85);
+  color: #fff;
+  font: 12px/1.4 'Microsoft YaHei', sans-serif;
+  white-space: nowrap;
+  pointer-events: none;
+  transition: opacity 0.7s ease;
+}
+.first-hint.fade { opacity: 0; }

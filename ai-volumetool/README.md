@@ -17,24 +17,34 @@
 
 ## 快速上手
 
-### 方式一：直接用打包版
+> 本项目仅支持 **Windows 10/11**（终端拉起、凭据读取等均为 Windows 实现）。
+
+### 方式一：下载预编译版（推荐，无需装 Node）
+
+到 [Releases 页面](https://github.com/1375692655hzh/ai-tool/releases) 下载最新的
+`AI用量宠物 x.x.x.exe`（便携版，双击即用）或 NSIS 安装包。
+数据保存在 `%APPDATA%\ai-volume-pet\config.json`，删除该文件即恢复出厂。
+
+> ⚠️ SmartScreen 可能提示"未知发布者"——点「更多信息 → 仍要运行」；
+> 部分杀软可能对 Electron 打包脚本误报，详见 [NOTICE](NOTICE.md) 与
+> [开发指南的踩坑记录](docs/development.md#两个已踩过的坑)。
+
+### 方式二：自己打包
 
 ```bash
 npm install
-npm run dist     # 产出 dist/AI用量宠物 1.0.0.exe（便携版）与 NSIS 安装包
+npm run dist     # 产出 dist/AI用量宠物 x.x.x.exe（便携版）与 NSIS 安装包
 ```
 
-双击便携版 exe 即可运行，无需安装。数据保存在 `%APPDATA%\ai-volume-pet\config.json`。
+要求 Node.js ≥ 18（仅构建期需要，运行期无 Node 依赖）。
 
-### 方式二：源码运行
+### 方式三：源码运行（开发）
 
 ```bash
 npm install
-npm start        # 开发运行
+npm start        # 开发运行（已有实例在跑时会单例互斥：只唤起已运行的那只宠物）
 npm run mock     # （可选）本地 mock 渠道服务 127.0.0.1:4789，key=sk-test，用来试添加渠道
 ```
-
-要求：Windows 10/11 + Node.js ≥ 18（开发/打包），运行期无 Node 依赖。
 
 ### 第一次使用
 
