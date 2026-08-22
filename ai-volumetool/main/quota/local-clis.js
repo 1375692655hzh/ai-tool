@@ -447,8 +447,9 @@ async function queryBailian() {
   const cp = await execBl(['usage', 'coding-plan', '--output', 'json']);
   const cpAny = blJson(cp);
   if (cpAny && cpAny.error) {
-    if (/console access token/i.test(cpAny.error.message || '')) {
-      throw new Error('百炼 CLI 未登录控制台：请运行 bl auth login --console 完成浏览器登录');
+    // 登录态缺失/过期有几种文案（不同版本 CLI），统一映射成可操作提示
+    if (/console access token|not logged in|has expired|console session/i.test(cpAny.error.message || '')) {
+      throw new Error('百炼 CLI 登录已过期：请运行 bl auth login --console 重新浏览器登录');
     }
     throw new Error('百炼 Coding Plan 查询失败: ' + (cpAny.error.message || '').slice(0, 80));
   }
@@ -471,6 +472,9 @@ async function queryBailian() {
   const tp = await execBl(['usage', 'token-plan', '--output', 'json']);
   const tpData = blJson(tp);
   if (tpData && tpData.error) {
+    if (/not logged in|has expired|console session|console access token/i.test(tpData.error.message || '')) {
+      throw new Error('百炼 CLI 登录已过期：请运行 bl auth login --console 重新浏览器登录');
+    }
     throw new Error('百炼 Token Plan 查询失败: ' + (tpData.error.message || '').slice(0, 80));
   }
   if (tpData && (tpData.per5HourPercentage != null || tpData.per1WeekPercentage != null)) {
