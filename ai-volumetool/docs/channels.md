@@ -103,7 +103,7 @@
 
 - **前置条件**：桌面版 Cursor 已登录
 - **机制**：从 `%APPDATA%\Cursor\User\globalStorage\state.vscdb`（SQLite）读出登录 accessToken（纯 Node 页级读取，不引原生依赖，10GB 级库也毫秒级），请求 `api2.cursor.sh/auth/usage-summary`
-- **显示**：Auto / API 两个用量池的剩余百分比 + 账单周期重置日，标签显示套餐档（如 Pro）
+- **显示**：Auto / API 两个用量池的剩余百分比 + 账单周期重置日，标签显示套餐档（如 Pro）；接口返回绝对值时，组标题显示套餐已用/上限（如 `Pro · 1884/2000`）
 - **常见报错**：「登录已过期」→ 在 Cursor 里重新登录；「未开启套餐用量统计」→ 账号没有套餐
 
 ---

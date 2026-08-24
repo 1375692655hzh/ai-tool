@@ -3,7 +3,8 @@
 //       火山引擎官方 OpenAPI（AK/SK 签名）/ OpenAI 兼容计费（new-api 等中转站）
 //       DeepSeek 余额 / 本机 CLI（Claude Code / Codex / Antigravity）/ 自定义端点
 // 归一化输出：
-//   套餐窗口 { ok, kind:'windows', windows:[{key,label,percent,used,limit,resetAt}], status, ... }
+//   套餐窗口 { ok, kind:'windows', windows:[{key,label,percent,used,limit,resetAt,group?}], status, ... }
+//                                                                （group: 可选组标题，如 Cursor 的 "Pro · 1884/2000"）
 //   额度模式 { ok, kind:'usage', used, total, balance, percent, status, ... }
 //   余额模式 { ok, kind:'balance', balance, currency, status, ... }
 //   失败     { ok:false, status:'error', message }

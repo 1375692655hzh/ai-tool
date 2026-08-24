@@ -588,6 +588,13 @@ async function queryCursor() {
     win('cursor-api', 'API', pct(plan.apiPercentUsed), resetAt),
   ];
   const tag = ['Cursor', j.membershipType].filter(Boolean).join(' ');
+  // 套餐档位绝对值（接口字段 used/limit，如 pro 1884/2000）：挂在窗口组标题上展示
+  const hasAbs = [plan.used, plan.limit].every((x) => typeof x === 'number' && Number.isFinite(x) && x >= 0);
+  if (hasAbs) {
+    const tier = String(j.membershipType || '').replace(/^\w/, (ch) => ch.toUpperCase());
+    const group = [tier, `${plan.used}/${plan.limit}`].filter(Boolean).join(' · ');
+    for (const w of windows) w.group = group;
+  }
   return { kind: 'windows', windows, note: tag };
 }
 

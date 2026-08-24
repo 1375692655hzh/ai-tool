@@ -146,13 +146,15 @@
       if (r && r.ok && r.kind === 'windows' && Array.isArray(r.windows)) {
         // Coding Plan 套餐：单行 = 档位 + 剩余条 + 剩xx% + 重置时间
         // 带组前缀的标签（Antigravity 的 "Gemini 每周"/"Claude/GPT 5小时"）拆成
-        // 组标题 + 短档位行，避免长标签溢出盖住进度条
+        // 组标题 + 短档位行，避免长标签溢出盖住进度条；
+        // w.group（Cursor 的 "Pro · 1884/2000" 套餐绝对值）优先作为整组标题
         const tierRe = /^(.+)\s+(每周|月度|5小时|\d+小时|\d+天)$/;
         const groups = [];
         for (const w of r.windows) {
           const m = tierRe.exec(String(w.label || ''));
-          let g = m ? groups.find((x) => x.name === m[1]) : null;
-          if (!g) { g = { name: m ? m[1] : null, rows: [] }; groups.push(g); }
+          const name = w.group || (m && m[1]) || null;
+          let g = groups.find((x) => x.name === name);
+          if (!g) { g = { name, rows: [] }; groups.push(g); }
           g.rows.push([m ? m[2] : String(w.label || ''), w]);
         }
         for (const g of groups) {
