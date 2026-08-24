@@ -1,7 +1,7 @@
 {
   "name": "ai-volumetool",
   "productName": "ai-volume-pet",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "鲸鱼娘桌面宠物 · AI 渠道用量监控小工具（ai-tool 子项目）",
   "main": "main/main.js",
   "author": "1375692655hzh",
