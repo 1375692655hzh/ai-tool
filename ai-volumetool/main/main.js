@@ -2,7 +2,7 @@ const path = require('path');
 const fs = require('fs');
 const os = require('os');
 const { spawn } = require('child_process');
-const { app, ipcMain, shell, dialog, Tray, Menu, nativeImage } = require('electron');
+const { app, ipcMain, shell, dialog, Tray, Menu, nativeImage, Notification } = require('electron');
 const { Store } = require('./store');
 const { Poller } = require('./quota/poller');
 const { queryChannel } = require('./quota/sniffer');
@@ -12,6 +12,9 @@ const { listCharacters, loadCharacter, petSizeFor } = require('./characters');
 
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) app.quit();
+
+// Windows 通知身份（与 package.json 的 appId 一致）：不设置的话托盘气泡可能不显示或显示成 Electron 默认名
+app.setAppUserModelId('com.aivolumetool.pet');
 
 let store;
 let petWin, usageWin, settingsWin, tray, poller;
@@ -115,6 +118,55 @@ function broadcast(results) {
   }
   const anyError = Object.values(results).some((r) => r && r.ok === false);
   if (anyError && petWin && !petWin.isDestroyed()) petWin.webContents.send('pet:play', 'failed');
+  checkLowQuota(results);
+}
+
+// —— 低额度主动提醒 ——
+// 任一渠道剩余 <15% 时弹一次托盘气泡 + 宠物播 failed 动画；
+// 去重 key 含 resetAt，每轮重置周期只提醒一次；无 resetAt 的渠道（金额型）退化为每天一次
+const LOW_QUOTA_ALERT = 15;
+
+function dayAnchor() {
+  const d = new Date();
+  return `d${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+}
+
+function showLowQuotaNotice(body) {
+  if (tray) {
+    try { tray.displayBalloon({ iconType: 'warning', title: 'AI用量宠物 · 额度告急', content: body }); return; }
+    catch (e) { /* 气泡不可用时走系统通知兜底 */ }
+  }
+  try {
+    if (!Notification.isSupported()) return;
+    const n = new Notification({ title: 'AI用量宠物 · 额度告急', body });
+    n.on('click', toggleUsage);
+    n.show();
+  } catch (e) { /* 通知失败不影响主流程 */ }
+}
+
+function checkLowQuota(results) {
+  const fresh = [];
+  for (const c of store.channels) {
+    const r = results[c.id];
+    if (!r || !r.ok) continue;
+    const units = r.kind === 'windows'
+      ? (r.windows || []).map((w) => ({ key: w.key || '', label: w.label, resetAt: w.resetAt, percent: w.percent }))
+      : r.kind === 'usage' && r.percent != null
+        ? [{ key: '', label: '', resetAt: null, percent: r.percent }]
+        : [];
+    for (const u of units) {
+      if (u.percent == null) continue;
+      const rem = Math.max(100 - u.percent, 0);
+      if (rem >= LOW_QUOTA_ALERT) continue;
+      const dedupeKey = `${c.id}|${u.key}|${u.resetAt || dayAnchor()}`;
+      if (store.hasReminded(dedupeKey)) continue;
+      store.markReminded(dedupeKey);
+      fresh.push(`${c.name}${u.label ? '·' + u.label : ''} 剩 ${Math.round(rem)}%`);
+    }
+  }
+  if (!fresh.length) return;
+  showLowQuotaNotice(fresh.join('；').slice(0, 220));
+  if (petWin && !petWin.isDestroyed()) petWin.webContents.send('pet:play', 'failed');
 }
 
 function refreshPetConfig() {
@@ -261,6 +313,7 @@ function createTray() {
     { type: 'separator' },
     { label: '退出', click: () => app.quit() },
   ]));
+  tray.on('balloon-click', toggleUsage); // 点气泡直接看用量面板
 }
 
 app.whenReady().then(() => {

@@ -11,6 +11,7 @@
 
 - 🐳 **桌面宠物**：待机/散步/挥手/跳跃等动画，可拖拽、双击互动；形象可切换，支持自定义角色包
 - 📊 **渠道用量监控**：右键 →「显示用量」，每渠道一张卡片（状态灯 + 剩余进度条 + 重置倒计时）；查询失败的渠道自动沉底、被窗口底边遮住不碍眼
+- 🔔 **低额度主动提醒**：任一渠道剩余不足 15% 时托盘气泡提醒一次（每轮重置周期不重复），宠物同步播"失败"动画
 - 🔌 **16 种厂商模板**：官方 API 型（填 URL+KEY 即可）与本机凭证型（读本地 CLI/桌面端登录态，零配置）双路支持，另有自动嗅探与自定义端点兜底
 - 🚀 **启动工具菜单**：把常用的 AI 工具（VSCode/Cursor/各种 CLI）挂到宠物右键菜单一键拉起
 - 🔒 **本地优先**：APIKEY 用系统 DPAPI（Electron safeStorage）加密落盘；本机凭证型渠道只读本地文件、只请求官方接口，无任何第三方外发
@@ -22,7 +23,7 @@
 ### 方式一：下载预编译版（推荐，无需装 Node）
 
 到 [Releases 页面](https://github.com/1375692655hzh/ai-tool/releases) 下载最新的
-`AI用量宠物 x.x.x.exe`（便携版，双击即用）或 NSIS 安装包。
+`AI-Volume-Pet x.x.x.exe`（便携版，双击即用）或 NSIS 安装包。
 数据保存在 `%APPDATA%\ai-volume-pet\config.json`，删除该文件即恢复出厂。
 
 > ⚠️ SmartScreen 可能提示"未知发布者"——点「更多信息 → 仍要运行」；
@@ -33,7 +34,7 @@
 
 ```bash
 npm install
-npm run dist     # 产出 dist/AI用量宠物 x.x.x.exe（便携版）与 NSIS 安装包
+npm run dist     # 产出 dist/AI-Volume-Pet x.x.x.exe（便携版）与 NSIS 安装包
 ```
 
 要求 Node.js ≥ 18（仅构建期需要，运行期无 Node 依赖）。
@@ -68,7 +69,7 @@ npm run mock     # （可选）本地 mock 渠道服务 127.0.0.1:4789，key=sk-
 | Claude Code / Pro / Max | 本机 | 订阅登录 或 用过即可 | 5小时/每周剩余（三路自适应） |
 | Codex | 本机 | 用过 Codex CLI | 额度窗口剩余 |
 | Antigravity / Gemini CLI | 本机 | agy CLI 登录 | 各模型组额度 |
-| Cursor | 本机 | 桌面版已登录 | Auto/API 池剩余 + 重置日 |
+| Cursor | 本机 | 桌面版已登录 | 套餐已用/上限（如 Pro · 749/2000）+ Auto/API 池剩余 + 重置日 |
 | 自动检测 / 自定义端点 | - | URL + KEY（+字段映射） | 按接口而定 |
 
 逐厂商的详细配置说明（去哪里拿 KEY、常见报错怎么解）：**[docs/channels.md](docs/channels.md)**

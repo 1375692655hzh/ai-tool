@@ -13,6 +13,7 @@ const DEFAULTS = {
   },
   lastResults: {},       // channelId -> 最近一次查询结果（启动时立即可显示）
   petPosition: null,     // {x,y}
+  reminders: {},         // 低额度提醒去重：key(channelId|窗口|重置周期) -> 已提醒时间戳
 };
 
 class Store {
@@ -122,6 +123,19 @@ class Store {
   setDetectedType(channelId, type) {
     const c = this.data.channels.find((x) => x.id === channelId);
     if (c) { c.detectedType = type; this.save(); }
+  }
+
+  /** 低额度提醒去重：同一渠道同一重置周期只提醒一次（resetAt 变化即视为新周期） */
+  hasReminded(key) { return Object.prototype.hasOwnProperty.call(this.data.reminders, key); }
+
+  markReminded(key) {
+    const now = Date.now();
+    // 顺手清掉 45 天前的旧周期记录，防止长期使用后无限膨胀
+    for (const k of Object.keys(this.data.reminders)) {
+      if (now - this.data.reminders[k] > 45 * 86400000) delete this.data.reminders[k];
+    }
+    this.data.reminders[key] = now;
+    this.save();
   }
 }
 
