@@ -94,6 +94,15 @@ class VideoRenderer {
     this.video.muted = true;
     this.video.autoplay = true;
     this.video.playsInline = true;
+    // 构造时立刻挂上 idle 素材并起播：ready 等 loadeddata，而 src 只在 play() 里设，
+    // 不先设 src 的话 ready 永远不 resolve，宠物会隐身到第一个外部 play 事件为止
+    const idleSt = this.cfg.states.idle || {};
+    const idleFile = idleSt.file || (idleSt.files || [])[0];
+    if (idleFile) {
+      this.video.loop = idleSt.loop !== false;
+      this.video.src = mediaUrl(this.cfg.base, idleFile);
+      this.video.play().catch(() => {});
+    }
     const pump = () => {
       if (this.video.readyState >= 2 && this.video.videoWidth) {
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
@@ -163,6 +172,13 @@ class StaticRenderer {
     this.img.className = 'pet-media';
     this.img.draggable = false;
     el.appendChild(this.img);
+    // 同 VideoRenderer：构造时直接挂 idle 图，否则 ready 等 onload 而 src 未设，永远不渲染
+    const idleSt = cfg.states.idle || {};
+    const idleFile = idleSt.file || (idleSt.files || [])[0];
+    if (idleFile) {
+      this.img.classList.toggle('bob', !!idleSt.bob);
+      this.img.src = mediaUrl(cfg.base, idleFile);
+    }
     this.ready = new Promise((res) => {
       this.img.onload = () => res();
       this.img.onerror = () => res();

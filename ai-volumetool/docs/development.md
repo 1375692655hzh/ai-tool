@@ -77,8 +77,8 @@ poller.js（定时，默认5分钟）
 3. **CDP 手测**（verify.js 不够用时）：
    ```bash
    # 用调试端口拉起便携版（端口被占就换一个）
-   powershell "Start-Process -FilePath 'dist\AI用量宠物 1.0.0.exe' -ArgumentList '--remote-debugging-port=9224'"
-   # 然后 ws 连 http://127.0.0.1:9224/json/list 里目标页面的 webSocketDebuggerUrl，
+   powershell "Start-Process -FilePath 'dist\AI-Volume-Pet 1.0.1.exe' -ArgumentList '--remote-debugging-port=9225'"
+   # 然后 ws 连 http://127.0.0.1:9225/json/list 里目标页面的 webSocketDebuggerUrl，
    # Runtime.evaluate 里可调 window.api.invoke(...) 驱动真实 IPC 路径
    ```
    - 宠物可见性以「`.pet-media` 元素实际不透明像素 > 0」为准，不要只看元素存在

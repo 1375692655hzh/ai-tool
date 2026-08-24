@@ -27,6 +27,7 @@
   "build": {
     "appId": "com.aivolumetool.pet",
     "productName": "AI用量宠物",
+    "artifactName": "AI-Volume-Pet-${version}.${ext}",
     "files": [
       "main/**/*",
       "renderer/**/*",
@@ -41,7 +42,8 @@
     },
     "nsis": {
       "oneClick": false,
-      "allowToChangeInstallationDirectory": true
+      "allowToChangeInstallationDirectory": true,
+      "artifactName": "AI-Volume-Pet-Setup-${version}.${ext}"
     }
   }
 }
