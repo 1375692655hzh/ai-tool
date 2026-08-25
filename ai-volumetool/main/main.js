@@ -280,6 +280,11 @@ function setupIpc() {
   ipcMain.handle('settings:close', () => { if (settingsWin && !settingsWin.isDestroyed()) settingsWin.hide(); });
   ipcMain.handle('tool:launch', (_e, tool) => launchTool(tool));
   ipcMain.handle('characters:list', () => listCharacters());
+  // 百炼会话过期的一键重登：拉起终端跑 bl auth login --console（浏览器登录后下轮轮询自动恢复）
+  ipcMain.handle('bailian:relogin', () => {
+    launchTool({ type: 'term', cmd: 'bl auth login --console' });
+    return { ok: true };
+  });
 
   // —— 用量查询 ——
   ipcMain.handle('channel:test', (_e, ch) => {

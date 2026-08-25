@@ -7,7 +7,7 @@ const VALID_INVOKE = new Set([
   'settings:get', 'settings:save',
   'channel:test', 'quota:get-results', 'quota:poll-now',
   'open:official', 'usage:toggle', 'usage:close', 'usage:fit-height', 'settings:open', 'settings:close', 'app:quit',
-  'characters:list', 'tool:launch',
+  'characters:list', 'tool:launch', 'bailian:relogin',
 ]);
 
 const VALID_ON = new Set(['quota:update', 'pet:play', 'pet:config', 'channels:refresh']);

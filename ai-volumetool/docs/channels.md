@@ -86,6 +86,7 @@
 - **机制**：按序读取 `~/.gemini/antigravity-cli/antigravity-oauth-token` → Windows 凭据管理器 `gemini:antigravity` 条目 → 必要时用 Google 公开客户端常量刷新 token，再调 Google 官方配额接口
 - **显示**：各模型组（Gemini / Claude / GPT 等）的额度窗口
 - **注意**：`~/.gemini/oauth_creds.json`（Gemini CLI 直登）的 token 被配额接口拒收，会提示换 agy 登录
+- **网络**：Google 域名国内需代理——应用出站请求自动遵循 Windows 系统代理（Clash/v2ray 等的系统代理模式即可，无需 TUN/全局）；报 `fetch failed` 先检查代理是否在跑
 
 ### MiniMax Token Plan（本机 mmx CLI）
 
@@ -97,7 +98,7 @@
 
 - **前置条件**：`npm install -g bailian-cli` 且 `bl auth login --console`（浏览器登录控制台）
 - **机制**：依次执行 `bl usage coding-plan` / `token-plan` / `summary`，显示 5小时/每周/月度 窗口剩余
-- **常见报错**：「未登录控制台」→ 重新 `bl auth login --console`
+- **常见报错**：「未登录控制台」→ 控制台会话服务端约 **24 小时**过期（CLI 无续期机制），用量卡片上点「🔑 一键重新登录」会拉起终端跑 `bl auth login --console`，浏览器登录后下一轮轮询自动恢复
 
 ### Cursor（本机额度）
 

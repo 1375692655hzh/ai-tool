@@ -98,6 +98,16 @@
       `⚠ 刷新失败，显示 ${fmtTime(r.updatedAt)} 的数据${r.staleMessage ? '：' + r.staleMessage : ''}`);
   }
 
+  // 百炼控制台会话服务端约 24 小时过期且 CLI 无续期机制；检测到过期时给一键重登
+  // （拉起终端跑 bl auth login --console，浏览器登录完成后下一轮轮询自动恢复）
+  function maybeRelogin(r) {
+    const msg = (r && (r.staleMessage || r.message)) || '';
+    if (!/百炼 CLI 登录已过期/.test(msg)) return null;
+    const btn = el('button', 'relogin-btn', '🔑 一键重新登录');
+    btn.addEventListener('click', () => window.api.invoke('bailian:relogin'));
+    return btn;
+  }
+
   // 渲染完成后把自然高度（标题栏 + 卡片内容）报给主进程贴合窗口，消灭下方留白。
   // 失败/不支持的渠道沉底（.bad）：高度只量到最后一张正常卡，把它们留在窗口底边之下（可滚动查看）
   function fitHeight() {
@@ -204,6 +214,8 @@
 
       const note = staleNote(r);
       if (note) card.appendChild(note);
+      const relogin = maybeRelogin(r);
+      if (relogin) card.appendChild(relogin);
       cardsEl.appendChild(card);
     }
     fitHeight();

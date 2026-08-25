@@ -100,6 +100,20 @@ html, body {
 }
 .site-btn:hover { background: #eef4ff; }
 
+/* 一键重新登录（百炼过期卡） */
+.relogin-btn {
+  display: block;
+  margin: 6px 0 2px;
+  border: 1px solid #f0c36d;
+  background: #fff8ec;
+  color: #9a6b00;
+  border-radius: 4px;
+  padding: 3px 8px;
+  cursor: pointer;
+  font-size: 11px;
+}
+.relogin-btn:hover { background: #ffefcf; }
+
 /* —— 套餐窗口行：标签 + 剩余条 + 剩xx% —— */
 .win-group {
   margin: 3px 0 0;

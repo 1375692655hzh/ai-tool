@@ -83,7 +83,9 @@ poller.js（定时，默认5分钟）
    ```
    - 宠物可见性以「`.pet-media` 元素实际不透明像素 > 0」为准，不要只看元素存在
    - 面板高度 = 标题栏 + 正常卡底边（`.card:not(.bad)` 最低一张的 offsetBottom）
-4. **打包回归**：改完必须 `npm run dist` 再测——便携版有解包缓存，运行旧 exe 测的是旧代码
+4. **打包回归**：改完必须 `npm run dist` 再测——便携版有解包缓存，运行旧 exe 测的是旧代码。
+   构建前先退出正在运行的宠物：便携版 exe 正被运行时被 Windows 锁定，electron-builder 覆盖不了它会一直
+   卡在 `output file is locked for writing => waiting for unlock`（表现像构建死锁）
 
 ## 发布
 
