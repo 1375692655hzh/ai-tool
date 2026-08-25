@@ -5,6 +5,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { execFile } = require('child_process');
+const { smartFetch } = require('./http');
 
 const home = os.homedir();
 
@@ -98,7 +99,7 @@ async function queryClaudeBootstrap() {
   if (exp && exp < Date.now() + 60000) {
     throw new Error('Claude 登录凭证已过期，请运行 claude 执行 /login 后再刷新');
   }
-  const res = await fetch('https://api.claude.ai/api/bootstrap?returnBeta=true', {
+  const res = await smartFetch('https://api.claude.ai/api/bootstrap?returnBeta=true', {
     headers: { Authorization: 'Bearer ' + token, 'User-Agent': 'claude-cli/2.0.0 (external, cli)', Accept: 'application/json' },
   });
   if (res.status === 401 || res.status === 403) {
@@ -325,17 +326,21 @@ async function refreshAgyToken(cred) {
     : [[AGY_CLIENT_ID, AGY_CLIENT_SECRET], [GEMINI_CLIENT_ID, GEMINI_CLIENT_SECRET]];
   let lastErr = '';
   for (const [id, secret] of clients) {
-    const res = await fetch(AGY_TOKEN_URL, {
+    const res = await smartFetch(AGY_TOKEN_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({ client_id: id, client_secret: secret, refresh_token: cred.refresh_token, grant_type: 'refresh_token' }),
     });
     const data = await res.json().catch(() => ({}));
-    if (res.ok && data.access_token) return data.access_token;
+    if (res.ok && data.access_token) return { token: data.access_token, expiresIn: Number(data.expires_in) || 3600 };
     lastErr = res.status + ' ' + (data.error || '');
   }
   throw new Error('Antigravity 凭证刷新失败（' + lastErr + '），请重新运行 agy 登录');
 }
+
+// 刷新结果的内存缓存：磁盘凭证（尤其凭据管理器里的）不会回写新 token，
+// 不缓存的话每轮轮询都要刷新一次 Google 令牌
+let agyTokenCache = { refresh: '', token: '', expMs: 0 };
 
 async function agyAccessToken() {
   let cred = readAgyTokenFile();
@@ -349,8 +354,13 @@ async function agyAccessToken() {
     throw new Error('未找到本机 Antigravity 登录凭证（需在本机登录过 Antigravity CLI：运行 agy 按提示登录）');
   }
   if (cred.access_token && cred.expMs > Date.now() + 60000) return cred.access_token;
+  if (agyTokenCache.refresh && agyTokenCache.refresh === cred.refresh_token && agyTokenCache.expMs > Date.now() + 60000) {
+    return agyTokenCache.token;
+  }
   if (!cred.refresh_token) throw new Error('Antigravity 凭证缺少 refresh_token，请重新运行 agy 登录');
-  return refreshAgyToken(cred);
+  const fresh = await refreshAgyToken(cred);
+  agyTokenCache = { refresh: cred.refresh_token, token: fresh.token, expMs: Date.now() + (fresh.expiresIn - 60) * 1000 };
+  return fresh.token;
 }
 
 function agyGroupTitle(displayName) {
@@ -362,7 +372,7 @@ function agyGroupTitle(displayName) {
 
 async function queryAntigravity() {
   const token = await agyAccessToken();
-  const res = await fetch(AGY_QUOTA_URL, {
+  const res = await smartFetch(AGY_QUOTA_URL, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', 'User-Agent': AGY_UA },
     body: '{}',
@@ -569,7 +579,7 @@ async function queryCursor() {
 
   let res;
   try {
-    res = await fetch('https://api2.cursor.sh/auth/usage-summary', {
+    res = await smartFetch('https://api2.cursor.sh/auth/usage-summary', {
       headers: { Authorization: 'Bearer ' + token, 'User-Agent': 'ai-volume-pet' },
     });
   } catch (e) {

@@ -9,6 +9,8 @@
 //   余额模式 { ok, kind:'balance', balance, currency, status, ... }
 //   失败     { ok:false, status:'error', message }
 
+const { smartFetch } = require('./http');
+
 function normalizeBase(url) {
   return String(url || '').trim().replace(/\/+$/, '');
 }
@@ -30,7 +32,7 @@ async function fetchJson(url, apiKey, { auth = 'bearer', timeoutMs = 10000 } = {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
-    const res = await fetch(url, {
+    const res = await smartFetch(url, {
       signal: ctrl.signal,
       headers: {
         Authorization: auth === 'raw' ? apiKey : `Bearer ${apiKey}`,
@@ -184,7 +186,7 @@ async function callVolcano(action, ch) {
   const timer = setTimeout(() => ctrl.abort(), 10000);
   let data;
   try {
-    const res = await fetch(`https://${VOLC_HOST}/?${query}`, { method: 'POST', headers, body, signal: ctrl.signal });
+    const res = await smartFetch(`https://${VOLC_HOST}/?${query}`, { method: 'POST', headers, body, signal: ctrl.signal });
     data = await res.json();
   } finally {
     clearTimeout(timer);
