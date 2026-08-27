@@ -76,9 +76,10 @@
 
 ### Codex（本机额度）
 
-- **前置条件**：用过 Codex CLI（ChatGPT 登录）
-- **机制**：读取 `~/.codex/sessions/**/*.jsonl` 里最新一条官方额度记录（主窗口/周窗口的 used_percent 与 resets_at），不联网
-- **常见报错**：「近 35 天的会话里没有额度记录」→ 该机器上没跑过 Codex CLI
+- **前置条件**：Codex CLI 以 ChatGPT 账号登录过（`~/.codex/auth.json`）
+- **机制（实时优先）**：用本机登录态直查官方额度接口 `chatgpt.com/backend-api/codex/usage`（需代理环境，走系统代理），每轮轮询都是当前值；接口不通/未登录时回退读 `~/.codex/sessions/**/*.jsonl` 里最新一条额度快照（note 会标注「快照」，超过时效再标注「数据截至 M/d HH:mm」）
+- **显示**：标签带套餐档（如 `Codex · free`），主窗口（free 档为 30 天月度）剩余百分比 + 重置日
+- **说明**：GPT 网页版的用量与 Codex CLI 额度是**两个独立的池子**，网页聊天不会动这张卡；经沙箱运行的 codex（如 AI 工具内委托）消耗额度但不落会话文件——实时接口路径对这类场景是唯一准确的数据源
 
 ### Antigravity / Gemini CLI（本机额度）
 

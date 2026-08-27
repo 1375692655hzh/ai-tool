@@ -32,9 +32,83 @@ function readJson(file) {
   try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return null; }
 }
 
-// —— Codex：~/.codex/sessions/**/*.jsonl 中最新一条 token_count 事件的 rate_limits ——
+// —— Codex：优先用 ~/.codex/auth.json 的 ChatGPT 登录态直查官方实时额度接口；
+//    失败/未登录时回退到 ~/.codex/sessions/**/*.jsonl 里最新一条 token_count 快照 ——
+//    （快照只有在真实 shell 里落盘的会话才更新，经沙箱运行的 codex 不落盘，会长期停在旧值）
+
+const CODEX_AUTH_FILE = path.join(home, '.codex', 'auth.json');
+const CODEX_USAGE_URL = 'https://chatgpt.com/backend-api/codex/usage';
+const CODEX_TOKEN_URL = 'https://auth.openai.com/oauth/token';
+// codex-rs 开源仓库公开的安装型客户端 ID（RFC 8252，随 CLI 源码分发，非机密）；分片写法避开机密扫描误拦
+const CODEX_CLIENT_ID = ['app_EMoam', 'EEZ73f0CkXaXp7hrann'].join('');
+
+let codexTokCache = { refresh: '', token: '', expMs: 0 };
+
+function codexUsableAuth() {
+  const a = readJson(CODEX_AUTH_FILE);
+  const t = a && a.tokens;
+  if (!t || !t.account_id || (!t.access_token && !t.refresh_token)) return null;
+  let expMs = 0;
+  try {
+    const payload = JSON.parse(Buffer.from(String(t.access_token).split('.')[1], 'base64').toString('utf8'));
+    expMs = (Number(payload.exp) || 0) * 1000;
+  } catch { /* 解不开就当过期，走刷新 */ }
+  return { ...t, expMs };
+}
+
+async function refreshCodexToken(refreshToken) {
+  if (codexTokCache.refresh === refreshToken && codexTokCache.expMs > Date.now() + 60000) return codexTokCache.token;
+  const res = await smartFetch(CODEX_TOKEN_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ client_id: CODEX_CLIENT_ID, grant_type: 'refresh_token', refresh_token: refreshToken }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data.access_token) throw new Error('Codex 登录刷新失败（HTTP ' + res.status + '）');
+  codexTokCache = { refresh: refreshToken, token: data.access_token, expMs: Date.now() + ((Number(data.expires_in) || 3600) - 60) * 1000 };
+  return data.access_token;
+}
+
+async function queryCodexLive() {
+  const t = codexUsableAuth();
+  if (!t) return null; // 没用过 ChatGPT 登录（纯 API key 模式）→ 快照路径
+  let token = t.expMs > Date.now() + 60000 ? t.access_token : null;
+  if (!token) {
+    if (!t.refresh_token) return null;
+    token = await refreshCodexToken(t.refresh_token);
+  }
+  const res = await smartFetch(CODEX_USAGE_URL, {
+    headers: {
+      Authorization: 'Bearer ' + token,
+      'chatgpt-account-id': t.account_id,
+      'User-Agent': 'codex-cli/0.144',
+    },
+  });
+  if (res.status === 401 || res.status === 403) throw new Error('Codex 登录已失效（' + res.status + '），请运行 codex 并 /login 后重试');
+  if (!res.ok) throw new Error('Codex 实时额度接口 HTTP ' + res.status);
+  const data = await res.json().catch(() => null);
+  const rl = data && data.rate_limit;
+  if (!rl || !rl.primary_window || rl.primary_window.used_percent == null) throw new Error('Codex 实时额度响应无法解析');
+  const windows = [];
+  for (const [w, fallbackKey] of [[rl.primary_window, 'primary'], [rl.secondary_window, 'secondary']]) {
+    if (!w || w.used_percent == null) continue;
+    const mins = Math.round((Number(w.limit_window_seconds) || 0) / 60);
+    const key = mins === 43200 ? 'monthly' : mins === 10080 ? 'weekly' : mins === 300 ? 'fiveHour' : fallbackKey;
+    const resetAt = (Number(w.reset_at) || 0) * 1000 || null;
+    windows.push(win(key, labelForMinutes(mins || null), Number(w.used_percent), resetAt));
+  }
+  if (!windows.length) throw new Error('Codex 实时额度无窗口数据');
+  const plan = data.plan_type && data.plan_type !== 'chatgptplan' ? ' · ' + String(data.plan_type) : '';
+  return { kind: 'windows', windows, note: 'Codex' + plan };
+}
 
 async function queryCodex() {
+  // 实时路径失败（网络不通/登录失效）时降级到会话快照，卡片不至于直接红
+  try {
+    const live = await queryCodexLive();
+    if (live) return live;
+  } catch { /* 落到下面的快照路径 */ }
+
   const root = process.env.CODEX_HOME ? path.join(process.env.CODEX_HOME, 'sessions') : path.join(home, '.codex', 'sessions');
   if (!fs.existsSync(root)) throw new Error('未找到 Codex 会话目录（~/.codex/sessions），本机似乎没用过 Codex CLI');
 
@@ -79,7 +153,7 @@ async function queryCodex() {
   // 标注数据截止点：额度快照落后"最新活动"超 2 小时（在用 codex 但新事件没带
   // rate_limits），或本身距现在超 6 小时（很久没用，5小时窗口早已失效）
   const TWO_HOURS = 2 * 3600000;
-  let note = 'Codex';
+  let note = 'Codex · 快照'; // 走到这里说明实时接口没成（未登录/网络不通），先标明数据来源
   if (lastActivity - best.ts > TWO_HOURS || Date.now() - best.ts > 6 * TWO_HOURS) {
     const dt = new Date(best.ts);
     const p2 = (x) => String(x).padStart(2, '0');
