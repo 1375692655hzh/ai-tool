@@ -54,8 +54,9 @@ async function queryCodex() {
   })(root);
   files.sort((a, b) => b.mtime - a.mtime);
 
-  let best = null; // { ts, rl }
-  for (const { p } of files.slice(0, 60)) {
+  let best = null;      // { ts, rl }：事件时间戳全局最新的一条 rate_limits 记录
+  let lastActivity = 0; // 最新一条 token_count（无论有无 rate_limits）的时间戳
+  for (const { p } of files.slice(0, 200)) {
     let text;
     try { text = fs.readFileSync(p, 'utf8'); } catch { continue; }
     for (const line of text.split('\n')) {
@@ -64,14 +65,26 @@ async function queryCodex() {
       try { d = JSON.parse(line); } catch { continue; }
       const payload = d.payload || {};
       if (payload.type !== 'token_count') continue;
-      const rl = payload.rate_limits;
-      if (!rl) continue;
       const ts = Date.parse(d.timestamp || '') || 0;
+      if (ts > lastActivity) lastActivity = ts;
+      const rl = payload.rate_limits;
+      if (!rl) continue; // 新版 CLI 可能只在部分事件带 rate_limits，不带的只参与"最新活动"计时
       if (!best || ts > best.ts) best = { ts, rl };
     }
-    if (best) break; // 文件按新到旧，第一个命中的文件里再取时间戳最大的一条即可
+    // 不能见好就收：文件按 mtime 排序不等于事件时间排序，且最新文件可能缺 rate_limits，
+    // 必须扫完才能确定全局最新的额度记录（否则会卡死在旧快照上）
   }
   if (!best) throw new Error('近 35 天的 Codex 会话里没有额度记录（用过 Codex CLI 后才会出现）');
+
+  // 标注数据截止点：额度快照落后"最新活动"超 2 小时（在用 codex 但新事件没带
+  // rate_limits），或本身距现在超 6 小时（很久没用，5小时窗口早已失效）
+  const TWO_HOURS = 2 * 3600000;
+  let note = 'Codex';
+  if (lastActivity - best.ts > TWO_HOURS || Date.now() - best.ts > 6 * TWO_HOURS) {
+    const dt = new Date(best.ts);
+    const p2 = (x) => String(x).padStart(2, '0');
+    note += ` · 数据截至 ${dt.getMonth() + 1}/${dt.getDate()} ${p2(dt.getHours())}:${p2(dt.getMinutes())}`;
+  }
 
   const windows = [];
   for (const [field, key] of [['primary', 'primary'], ['secondary', 'weekly']]) {
@@ -81,7 +94,7 @@ async function queryCodex() {
     windows.push(win(mins === 43200 ? 'monthly' : key, labelForMinutes(mins), Number(w.used_percent), toResetMs(w.resets_at)));
   }
   if (!windows.length) throw new Error('Codex 额度记录里没有可用窗口');
-  return { kind: 'windows', windows };
+  return { kind: 'windows', windows, note };
 }
 
 // —— Claude Code：优先 Pro/Max 登录凭证实时查询，回退 statusline 快照 ——
