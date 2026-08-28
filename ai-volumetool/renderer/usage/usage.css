@@ -8,12 +8,20 @@ html, body {
   color: #2b3445;
   user-select: none;
   -webkit-user-select: none;
+  height: 100%;
+  overflow: hidden; /* 页面级不滚动：滚动只发生在 #cards，避免双滚轴 */
+}
+
+body {
+  display: flex;
+  flex-direction: column;
 }
 
 #titlebar {
   display: flex;
   align-items: center;
   padding: 4px 8px;
+  flex: none;
   background: linear-gradient(135deg, #2f6fdd, #4a90e2);
   color: #fff;
   -webkit-app-region: drag;
@@ -37,8 +45,9 @@ html, body {
 #titlebar button:hover { background: rgba(255, 255, 255, 0.35); }
 
 #cards {
+  flex: 1 1 auto;
+  min-height: 0; /* flex 子项允许收缩到比内容小，滚动条才能正确出现在这里 */
   padding: 5px;
-  max-height: calc(100vh - 30px);
   overflow-y: auto;
 }
 
