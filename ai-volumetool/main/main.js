@@ -232,18 +232,26 @@ function setupIpc() {
     petWin.setPosition(Math.round(cx), Math.round(cy));
     store.setPetPosition({ x: Math.round(cx), y: Math.round(cy) });
   });
-  // 用量面板按内容自适应高度：渲染器量好自然高度上报，这里钳到工作区内再贴合
-  ipcMain.handle('usage:fit-height', (_e, h) => {
+  // 用量面板按内容自适应尺寸：渲染器量好自然宽高上报，这里钳到工作区内再贴合
+  ipcMain.handle('usage:fit-height', (_e, h, w) => {
     if (!usageWin || usageWin.isDestroyed()) return;
     const n = Math.round(Number(h) || 0);
     if (!(n > 0)) return;
     const { screen } = require('electron');
-    const maxH = screen.getPrimaryDisplay().workArea.height - 40;
+    const area = screen.getPrimaryDisplay().workArea;
+    const maxH = area.height - 40;
     const height = Math.min(Math.max(n, 120), maxH);
-    const [w, curH] = usageWin.getSize();
-    if (Math.abs(curH - height) <= 1) return;
-    usageWin.setSize(w, height);
-    if (usageWin.isVisible()) placeUsageNearPet(usageWin, petWin); // 高度变了重新贴宠物
+    let width = Math.round(Number(w) || 0);
+    if (width) width = Math.min(Math.max(width, 200), area.width - 20); // 双列 515 也要放得下
+    const [curW, curH] = usageWin.getSize();
+    if (!width) width = curW;
+    if (Math.abs(curH - height) <= 1 && Math.abs(curW - width) <= 1) return;
+    // resizable:false 的窗口直接 setSize 会"半生效"（尤其缩小时）——临时解锁再锁回
+    usageWin.setResizable(true);
+    usageWin.setSize(width, height);
+    usageWin.setResizable(false);
+    if (usageWin.isVisible()) placeUsageNearPet(usageWin, petWin); // 尺寸变了重新贴宠物
+    // 宽度变化后渲染器会自校准重测高度（fitHeight 检测到视口变宽会再报一轮）
   });
   ipcMain.handle('pet:menu', () => {
     popupPetMenu({

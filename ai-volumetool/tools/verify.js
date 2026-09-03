@@ -102,7 +102,7 @@ const PET_OPAQUE_JS = `(()=>{
       winW:window.innerWidth, winH:window.innerHeight,
       hOverflow:document.documentElement.scrollWidth>window.innerWidth+1,
       fitBottom:last?Math.round(last.getBoundingClientRect().bottom):null };})()`);
-  check('面板宽度合理', panel.winW >= 200 && panel.winW <= 400, { winW: panel.winW });
+  check('面板宽度合理', panel.winW >= 200 && panel.winW <= 560, { winW: panel.winW });
   check('面板无横向溢出', !panel.hOverflow);
   if (panel.cards > 0) {
     check('面板高度贴合内容', Math.abs((panel.fitBottom || 0) - panel.winH) <= 8, { fitBottom: panel.fitBottom, winH: panel.winH });

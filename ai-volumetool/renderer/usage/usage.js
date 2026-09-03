@@ -110,18 +110,32 @@
 
   // 渲染完成后把自然高度（标题栏 + 卡片内容）报给主进程贴合窗口，消灭下方留白。
   // 失败/不支持的渠道沉底（.bad）：高度只量到最后一张正常卡，把它们留在窗口底边之下（可滚动查看）
+  // 双列时把目标宽度一并上报（单列 260 / 双列 515，与 CSS 卡宽 250 对应）
+  const PANEL_W = { one: 260, two: 515 };
+  // 宽度被主进程调整后视口才会真正变宽；在旧宽度下量的高度偏高（卡片挤压换行），
+  // 等 resize 事件落地后重测一轮才有意义
+  let refitArmed = false;
+  window.addEventListener('resize', () => {
+    if (!refitArmed) return;
+    refitArmed = false;
+    setTimeout(fitHeight, 60);
+  });
   function fitHeight() {
     requestAnimationFrame(() => requestAnimationFrame(() => {
       const tb = document.getElementById('titlebar');
       const okCards = cardsEl.querySelectorAll('.card:not(.bad)');
       let natural;
       if (okCards.length) {
-        const last = okCards[okCards.length - 1];
-        natural = last.offsetTop + last.offsetHeight + 5; // +cards 底 padding
+        // 网格下行高=行内最高卡，取正常卡的最大底边才是真实内容高度
+        let maxBottom = 0;
+        for (const c of okCards) maxBottom = Math.max(maxBottom, c.offsetTop + c.offsetHeight);
+        natural = maxBottom + 5; // +cards 底 padding
       } else {
         natural = tb.offsetHeight + cardsEl.scrollHeight;
       }
-      window.api.invoke('usage:fit-height', natural);
+      const width = cardsEl.classList.contains('two-col') ? PANEL_W.two : PANEL_W.one;
+      refitArmed = width !== window.innerWidth; // 视口即将变宽/变窄，resize 后重测
+      window.api.invoke('usage:fit-height', natural, width);
     }));
   }
 
@@ -139,6 +153,8 @@
       (r && r.ok ? okList : badList).push(ch);
     }
     const sorted = [...okList, ...badList];
+    // 正常卡 >3 张切双列（高度减半，一屏装下）；否则单列保持窄条
+    cardsEl.classList.toggle('two-col', okList.length > 3);
 
     // ② 全局更新时间 = 所有渠道里最新一次
     const times = Object.values(results).map((r) => r && r.updatedAt).filter(Boolean);

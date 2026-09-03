@@ -49,7 +49,14 @@ body {
   min-height: 0; /* flex 子项允许收缩到比内容小，滚动条才能正确出现在这里 */
   padding: 5px;
   overflow-y: auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 5px;
+  align-content: start;
 }
+/* 正常卡超过 3 张时切双列：面板加宽（约 515px）换高度减半，一屏装下所有卡片 */
+#cards.two-col { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+#cards .empty { grid-column: 1 / -1; }
 
 .empty {
   text-align: center;
@@ -61,7 +68,6 @@ body {
   background: #fff;
   border-radius: 7px;
   padding: 4px 7px;
-  margin-bottom: 5px;
   box-shadow: 0 1px 3px rgba(30, 50, 90, 0.08);
 }
 
