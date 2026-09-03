@@ -79,11 +79,11 @@
     return e;
   }
 
-  function head(ch, r, st) {
+  function head(ch, r, st, tagOverride) {
     const head = el('div', 'card-head');
     head.innerHTML = `<span class="dot ${st}"></span><span class="name"></span>`;
     head.querySelector('.name').textContent = ch.name;
-    if (r && r.ok) head.appendChild(el('span', 'tag', r.note || TYPE_TAG[r.kind] || '额度'));
+    if (r && r.ok) head.appendChild(el('span', 'tag', tagOverride || r.note || TYPE_TAG[r.kind] || '额度'));
     if (ch.official !== false) { // 本机渠道且没填官网地址时不显示按钮
       const siteBtn = el('button', 'site-btn', '官网');
       siteBtn.addEventListener('click', () => window.api.invoke('open:official', ch.id));
@@ -139,6 +139,39 @@
     }));
   }
 
+  // Coding Plan 窗口分组：带组前缀的标签（Antigravity 的 "Gemini 每周"/"Claude/GPT 5小时"、
+  // MINIMAX 的 "general 5小时"）拆成 组名 + 短档位行；
+  // w.group（Cursor 的 "Pro · 1884/2000" 套餐绝对值）优先作为整组标题
+  const tierRe = /^(.+)\s+(每周|月度|5小时|\d+小时|\d+天)$/;
+  function windowGroups(r) {
+    const groups = [];
+    for (const w of r.windows) {
+      const m = tierRe.exec(String(w.label || ''));
+      const name = w.group || (m && m[1]) || null;
+      let g = groups.find((x) => x.name === name);
+      if (!g) { g = { name, rows: [] }; groups.push(g); }
+      g.rows.push([m ? m[2] : String(w.label || ''), w]);
+    }
+    return groups;
+  }
+
+  // 单行 = 档位 + 剩余条 + 剩xx% + 重置时间
+  function appendWinRows(card, rows) {
+    for (const [label, w] of rows) {
+      const rem = w.percent != null ? Math.max(100 - Math.round(w.percent), 0) : null;
+      const row = el('div', 'win-row');
+      const lbl = el('span', 'win-label', label);
+      const track = el('span', 'bar-track');
+      const fill = el('span', 'bar-fill' + remClass(rem));
+      fill.style.width = (rem ?? 0) + '%';
+      track.appendChild(fill);
+      const pct = el('span', 'win-pct' + remClass(rem), rem != null ? '剩' + rem + '%' : 'N/A');
+      const rst = el('span', 'win-reset-inline', w.resetAt ? fmtResetShort(w.resetAt) : '');
+      row.append(lbl, track, pct, rst);
+      card.appendChild(row);
+    }
+  }
+
   function render() {
     if (!channels.length) {
       cardsEl.innerHTML = '<div class="empty">还没有配置渠道<br>右键宠物 → 设置 添加<br>各厂商怎么填见 README 渠道配置指南</div>';
@@ -146,15 +179,17 @@
       return;
     }
 
-    // 显示顺序：正常渠道按设置页顺序（↑↓ 手动调整），查询失败/不支持的压到最底下
-    const okList = [], badList = [];
+    // 显示顺序三档：正常 → 数据过期（登录失效等降级，仍显示旧数据）→ 查询失败/未支持
+    const freshList = [], staleList = [], badList = [];
     for (const ch of channels) {
       const r = results[ch.id];
-      (r && r.ok ? okList : badList).push(ch);
+      if (!(r && r.ok)) badList.push(ch);
+      else if (r.stale) staleList.push(ch);
+      else freshList.push(ch);
     }
-    const sorted = [...okList, ...badList];
-    // 正常卡 >3 张切双列（高度减半，一屏装下）；否则单列保持窄条
-    cardsEl.classList.toggle('two-col', okList.length > 3);
+    const sorted = [...freshList, ...staleList, ...badList];
+    // 正常+过期卡 >3 张切双列（高度减半，一屏装下）；否则单列保持窄条
+    cardsEl.classList.toggle('two-col', freshList.length + staleList.length > 3);
 
     // ② 全局更新时间 = 所有渠道里最新一次
     const times = Object.values(results).map((r) => r && r.updatedAt).filter(Boolean);
@@ -165,41 +200,24 @@
     for (const ch of sorted) {
       const r = results[ch.id];
       const st = statusOf(r);
-      const card = el('div', 'card');
-      if (!(r && r.ok)) card.classList.add('bad');
-      card.appendChild(head(ch, r, st));
+      const groups = r && r.ok && r.kind === 'windows' && Array.isArray(r.windows) ? windowGroups(r) : null;
+      // 多组额度（MINIMAX 的 general/video、Gemini CLI 的 Gemini/Claude·GPT）拆成
+      // 独立卡片并排落进两列，各自保留完整行布局；单组渠道维持整卡
+      const split = groups && groups.length >= 2 && groups.every((g) => g.name);
+      const sections = split ? groups : [null];
+      for (const sec of sections) {
+        const card = el('div', 'card');
+        if (!(r && r.ok)) card.classList.add('bad');
+        card.appendChild(head(ch, r, st, sec ? sec.name : null));
 
-      if (r && r.ok && r.kind === 'windows' && Array.isArray(r.windows)) {
-        // Coding Plan 套餐：单行 = 档位 + 剩余条 + 剩xx% + 重置时间
-        // 带组前缀的标签（Antigravity 的 "Gemini 每周"/"Claude/GPT 5小时"）拆成
-        // 组标题 + 短档位行，避免长标签溢出盖住进度条；
-        // w.group（Cursor 的 "Pro · 1884/2000" 套餐绝对值）优先作为整组标题
-        const tierRe = /^(.+)\s+(每周|月度|5小时|\d+小时|\d+天)$/;
-        const groups = [];
-        for (const w of r.windows) {
-          const m = tierRe.exec(String(w.label || ''));
-          const name = w.group || (m && m[1]) || null;
-          let g = groups.find((x) => x.name === name);
-          if (!g) { g = { name, rows: [] }; groups.push(g); }
-          g.rows.push([m ? m[2] : String(w.label || ''), w]);
-        }
-        for (const g of groups) {
-          if (g.name) card.appendChild(el('div', 'win-group', g.name));
-          for (const [label, w] of g.rows) {
-            const rem = w.percent != null ? Math.max(100 - Math.round(w.percent), 0) : null;
-            const row = el('div', 'win-row');
-            const lbl = el('span', 'win-label', label);
-            const track = el('span', 'bar-track');
-            const fill = el('span', 'bar-fill' + remClass(rem));
-            fill.style.width = (rem ?? 0) + '%';
-            track.appendChild(fill);
-            const pct = el('span', 'win-pct' + remClass(rem), rem != null ? '剩' + rem + '%' : 'N/A');
-            const rst = el('span', 'win-reset-inline', w.resetAt ? fmtResetShort(w.resetAt) : '');
-            row.append(lbl, track, pct, rst);
-            card.appendChild(row);
+        if (groups && !split) {
+          for (const g of groups) {
+            if (g.name) card.appendChild(el('div', 'win-group', g.name));
+            appendWinRows(card, g.rows);
           }
-        }
-      } else if (r && r.ok && r.kind === 'usage') {
+        } else if (groups && split) {
+          appendWinRows(card, sec.rows);
+        } else if (r && r.ok && r.kind === 'usage') {
         // 额度模式：剩余金额为主数字 + 剩余占比条 + 已用/总额
         const rem = r.percent != null ? Math.max(100 - Math.round(r.percent), 0) : null;
         const top = el('div', 'usage-top');
@@ -228,11 +246,15 @@
         card.appendChild(el('div', 'card-foot sub', '')).innerHTML = '<span>等待首次查询…</span>';
       }
 
-      const note = staleNote(r);
-      if (note) card.appendChild(note);
-      const relogin = maybeRelogin(r);
-      if (relogin) card.appendChild(relogin);
+      // 渠道级提示（过期降级说明/一键重登）只挂第一张卡，拆分卡不重复
+      if (sec === sections[0]) {
+        const note = staleNote(r);
+        if (note) card.appendChild(note);
+        const relogin = maybeRelogin(r);
+        if (relogin) card.appendChild(relogin);
+      }
       cardsEl.appendChild(card);
+      }
     }
     fitHeight();
   }
