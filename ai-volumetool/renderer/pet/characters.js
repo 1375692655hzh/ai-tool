@@ -146,9 +146,11 @@ class VideoRenderer {
       this.video.src = mediaUrl(this.cfg.base, idleFile);
       this.video.play().catch(() => {});
     }
-    // 帧采样并集：不同片段/帧的构图差异大（鲸鱼在画布里的位置随动作变），
-    // 播放过程中每 0.5s 对当前帧测一次不透明占比并持续并入足迹，
-    // 增长明显才上报主进程重钳。几分钟内自动收敛到角色所有动作的真实足迹
+    // 足迹锚定：以首个 idle 片段（files[0]）的实测占比为整个会话的钳制基准，
+    // 只在该片段播放时采样。各片段构图差异大（0.67~0.90 都有），若跟着当前片段变，
+    // 贴墙距离会忽远忽近；锚定后贴墙距离恒定，宽片段在墙边播放时鲸鱼边缘短暂
+    // 出画（透明画布裁切）——比 140px 空气墙好得多
+    this._anchorClip = this._curClip = idleFile ? mediaUrl(this.cfg.base, idleFile) : null;
     this._sampleCv = null;
     this._lastSampleAt = 0;
     this._reportedBounds = null;
@@ -176,9 +178,11 @@ class VideoRenderer {
       if (cb) cb(); else this.play('idle', { force: true });
     });
   }
-  // 测当前帧占比并入 _bounds；比上次上报明显变大（>1%）且距上次上报 >3s 才再报
+  // 测锚定 idle 片段当前帧的占比并入足迹（只测锚定片段，其它片段播放时不采样）；
+  // 比上次上报明显变大（>1%）且距上次上报 >3s 才再报
   _sampleFootprint() {
     try {
+      if (this._curClip !== this._anchorClip) return;
       if (!this._sampleCv) this._sampleCv = document.createElement('canvas');
       const b = measureAlphaBounds(
         (ctx, cw, ch) => ctx.drawImage(this.video, 0, 0, cw, ch),
@@ -226,6 +230,7 @@ class VideoRenderer {
     this.state = name;
     this.onFinish = onFinish;
     this._locked = !st.loop;
+    this._curClip = mediaUrl(this.cfg.base, pick); // 足迹锚定不变，仅记录当前片段供采样判断
     clearTimeout(this._timer);
     if (!st.loop) this._timer = setTimeout(() => {
       if (this.state === name && this._locked) { // ended 没触发时的保险
