@@ -3,10 +3,41 @@
 //   video       — 透明 webm 逐状态播放（dsh-pet 51 动作）
 //   static      — 静态立绘按状态换图 + CSS 呼吸浮动（pet-app 服装 / 鲸鱼挂件）
 // 统一接口：ready / play(name,{force,onFinish}) / setScale(s) / locked / state / destroy()
+//   + contentBounds() -> {fx,fy,fw,fh}|null 实测不透明内容占比（供边界钳制消除"空气墙"）
+//   + onContentBounds 回调：测量完成后触发（media 异步加载）
 
 // 素材地址：主进程已把外置包素材解析为绝对 file:// URL（中文/空格名已编码）；
 // 没有 base 的（内置鲸鱼娘）保持页面相对路径，交给浏览器自己解析
 const mediaUrl = (base, f) => (base && !/^[a-z]+:\/\//i.test(f) ? `${base}/${f}` : f);
+
+// 实测素材的不透明内容占比 {fx,fy,fw,fh}（相对窗口宽高）：
+// 窗口盒 ≠ 可见形象（视频/精灵图四周常有透明 padding），
+// 边界钳制若按窗口算，形象还没到屏幕边就被"空气墙"挡住。
+// 缩到 ≤256px 扫 alpha，一次测量后缓存。
+function measureAlphaBounds(draw, w, h, reuseCv) {
+  try {
+    const s = Math.min(1, 256 / Math.max(w, h));
+    const cw = Math.max(1, Math.round(w * s)), ch = Math.max(1, Math.round(h * s));
+    const cv = reuseCv || document.createElement('canvas');
+    cv.width = cw; cv.height = ch;
+    const ctx = cv.getContext('2d');
+    draw(ctx, cw, ch);
+    const d = ctx.getImageData(0, 0, cw, ch).data;
+    let minX = cw, minY = ch, maxX = -1, maxY = -1;
+    for (let y = 0; y < ch; y++) {
+      for (let x = 0; x < cw; x++) {
+        if (d[(y * cw + x) * 4 + 3] > 16) {
+          if (x < minX) minX = x;
+          if (x > maxX) maxX = x;
+          if (y < minY) minY = y;
+          if (y > maxY) maxY = y;
+        }
+      }
+    }
+    if (maxX < 0 || maxX < minX) return null;
+    return { fx: minX / cw, fy: minY / ch, fw: (maxX + 1 - minX) / cw, fh: (maxY + 1 - minY) / ch };
+  } catch { return null; }
+}
 
 // —— 精灵图（canvas 网格）——
 class SheetRenderer {
@@ -25,8 +56,20 @@ class SheetRenderer {
     this.img = new Image();
     this.img.src = mediaUrl(cfg.base, cfg.file);
     this.ready = this.img.decode().catch(() => {});
-    this.ready.then(() => { this.setScale(this.scale); this.play('idle', { force: true }); });
+    this.ready.then(() => {
+      this.setScale(this.scale);
+      this.play('idle', { force: true });
+      // 用 idle 行第一帧实测内容占比（其余帧差异通常可忽略）
+      const st = cfg.states.idle || {};
+      const b = measureAlphaBounds(
+        (ctx, cw, ch) => ctx.drawImage(this.img, 0, (st.row || 0) * cfg.frameH, cfg.frameW, cfg.frameH, 0, 0, cw, ch),
+        cfg.frameW, cfg.frameH
+      );
+      this._bounds = b;
+      if (b && this.onContentBounds) this.onContentBounds(b);
+    });
   }
+  contentBounds() { return this._bounds || null; }
   setScale(s) {
     this.scale = s;
     const w = Math.round(this.cfg.width * s), h = Math.round(this.cfg.height * s);
@@ -103,10 +146,22 @@ class VideoRenderer {
       this.video.src = mediaUrl(this.cfg.base, idleFile);
       this.video.play().catch(() => {});
     }
+    // 帧采样并集：不同片段/帧的构图差异大（鲸鱼在画布里的位置随动作变），
+    // 播放过程中每 0.5s 对当前帧测一次不透明占比并持续并入足迹，
+    // 增长明显才上报主进程重钳。几分钟内自动收敛到角色所有动作的真实足迹
+    this._sampleCv = null;
+    this._lastSampleAt = 0;
+    this._reportedBounds = null;
+    this._lastReportAt = 0;
     const pump = () => {
       if (this.video.readyState >= 2 && this.video.videoWidth) {
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
         this.ctx.drawImage(this.video, 0, 0, this.canvas.width, this.canvas.height);
+        const now = Date.now();
+        if (now - this._lastSampleAt > 500) {
+          this._lastSampleAt = now;
+          this._sampleFootprint();
+        }
       }
       this._raf = requestAnimationFrame(pump);
     };
@@ -120,8 +175,41 @@ class VideoRenderer {
       const cb = this.onFinish; this.onFinish = null;
       if (cb) cb(); else this.play('idle', { force: true });
     });
-    this.ready.then(() => { this.setScale(this.scale); this.play('idle', { force: true }); });
   }
+  // 测当前帧占比并入 _bounds；比上次上报明显变大（>1%）且距上次上报 >3s 才再报
+  _sampleFootprint() {
+    try {
+      if (!this._sampleCv) this._sampleCv = document.createElement('canvas');
+      const b = measureAlphaBounds(
+        (ctx, cw, ch) => ctx.drawImage(this.video, 0, 0, cw, ch),
+        this.video.videoWidth, this.video.videoHeight, this._sampleCv
+      );
+      if (!b) return;
+      if (!this._bounds) {
+        this._bounds = b;
+        this._reportedBounds = { ...b };
+        this._lastReportAt = Date.now();
+        if (this.onContentBounds) this.onContentBounds(b);
+        return;
+      }
+      const x1 = Math.max(this._bounds.fx + this._bounds.fw, b.fx + b.fw);
+      const y1 = Math.max(this._bounds.fy + this._bounds.fh, b.fy + b.fh);
+      this._bounds.fx = Math.min(this._bounds.fx, b.fx);
+      this._bounds.fy = Math.min(this._bounds.fy, b.fy);
+      this._bounds.fw = x1 - this._bounds.fx;
+      this._bounds.fh = y1 - this._bounds.fy;
+      const r = this._reportedBounds;
+      const grown = this._bounds.fx < r.fx - 0.01 || this._bounds.fy < r.fy - 0.01
+        || this._bounds.fx + this._bounds.fw > r.fx + r.fw + 0.01
+        || this._bounds.fy + this._bounds.fh > r.fy + r.fh + 0.01;
+      if (grown && Date.now() - this._lastReportAt > 3000) {
+        this._reportedBounds = { ...this._bounds };
+        this._lastReportAt = Date.now();
+        if (this.onContentBounds) this.onContentBounds(this._bounds);
+      }
+    } catch { /* 采样失败不影响渲染 */ }
+  }
+  contentBounds() { return this._bounds || null; }
   setScale(s) {
     this.scale = s;
     const w = Math.round(this.cfg.width * s), h = Math.round(this.cfg.height * s);
@@ -183,8 +271,17 @@ class StaticRenderer {
       this.img.onload = () => res();
       this.img.onerror = () => res();
     });
-    this.ready.then(() => { this.setScale(this.scale); this.play('idle', { force: true }); });
+    this.ready.then(() => {
+      this.setScale(this.scale);
+      this.play('idle', { force: true });
+      const b = this.img.naturalWidth
+        ? measureAlphaBounds((ctx, cw, ch) => ctx.drawImage(this.img, 0, 0, cw, ch), this.img.naturalWidth, this.img.naturalHeight)
+        : null;
+      this._bounds = b;
+      if (b && this.onContentBounds) this.onContentBounds(b);
+    });
   }
+  contentBounds() { return this._bounds || null; }
   setScale(s) {
     this.scale = s;
     const w = Math.round(this.cfg.width * s), h = Math.round(this.cfg.height * s);

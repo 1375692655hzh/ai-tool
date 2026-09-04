@@ -16,6 +16,13 @@
   sizeWindowTo(character, scale);
   let workArea = config.workArea;
 
+  // 内容占比上报：主进程的拖拽钳制按"可见形象"而非窗口盒计算（消除透明 padding 空气墙）
+  function attachBounds(a) {
+    a.onContentBounds = (b) => window.api.invoke('pet:content-bounds', b);
+    if (a.contentBounds()) window.api.invoke('pet:content-bounds', a.contentBounds());
+  }
+  attachBounds(animator);
+
   // 首次启动提示：告诉新用户右键有菜单（localStorage 记一次即不再出现）
   try {
     if (!localStorage.getItem('hint-rightclick')) {
@@ -52,6 +59,7 @@
       animator.destroy();
       character = next;
       animator = window.createCharacter(el, character);
+      attachBounds(animator);
     }
     sizeWindowTo(character, scale);
     animator.setScale(scale);
@@ -59,7 +67,6 @@
 
   // —— 自主行为：随机散步 + 久不互动发呆 ——
   const SCALE = () => animator.scale;
-  const CHAR_W = () => character.width;
 
   function wander() {
     if (animator.locked || animator.state !== 'idle') return;
@@ -74,10 +81,14 @@
     const speed = 2; // px / 100ms
     animator.play(`running-${dir}`);
     const step = dir === 'left' ? -speed : speed;
+    // 边界按"可见形象"（内容占比）而非窗口盒算，不然透明 padding 会让宠物提前撞空气墙掉头
+    const frac = animator.contentBounds() || { fx: 0, fy: 0, fw: 1, fh: 1 };
+    const W = window.innerWidth;
+    const leftLimit = workArea.x - frac.fx * W;
+    const rightLimit = workArea.x + workArea.width - (frac.fx + frac.fw) * W;
     const mover = setInterval(() => {
       const x = window.screenX + step;
-      const w = CHAR_W() * SCALE();
-      if (x < workArea.x || x > workArea.x + workArea.width - w) {
+      if (x < leftLimit || x > rightLimit) {
         clearInterval(mover);
         animator.play('idle', { force: true });
         return;

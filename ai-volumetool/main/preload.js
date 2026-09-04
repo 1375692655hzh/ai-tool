@@ -2,7 +2,7 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 const VALID_INVOKE = new Set([
-  'pet:ready', 'pet:set-position', 'pet:menu',
+  'pet:ready', 'pet:set-position', 'pet:menu', 'pet:content-bounds',
   'channels:get-for-settings', 'channels:save',
   'settings:get', 'settings:save',
   'channel:test', 'quota:get-results', 'quota:poll-now',

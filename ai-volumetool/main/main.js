@@ -18,6 +18,43 @@ app.setAppUserModelId('com.aivolumetool.pet');
 
 let store;
 let petWin, usageWin, settingsWin, tray, poller;
+// 渲染器实测的可见内容占比 {fx,fy,fw,fh}（相对窗口）：透明 padding 不算"身体"，
+// 拖拽/散步的边界钳制按内容盒算，形象才能真正贴到屏幕边（消除空气墙）
+let petContent = null;
+
+function validFractions(b) {
+  return b && [b.fx, b.fy, b.fw, b.fh].every((n) => Number.isFinite(n) && n >= 0 && n <= 1) && b.fw > 0 && b.fh > 0
+    ? { fx: b.fx, fy: b.fy, fw: b.fw, fh: b.fh } : null;
+}
+
+// 所有显示器工作区的联合边界
+function unionWorkArea() {
+  const { screen } = require('electron');
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const d of screen.getAllDisplays()) {
+    const a = d.workArea;
+    minX = Math.min(minX, a.x); minY = Math.min(minY, a.y);
+    maxX = Math.max(maxX, a.x + a.width); maxY = Math.max(maxY, a.y + a.height);
+  }
+  return { minX, minY, maxX, maxY };
+}
+
+// 把宠物窗口钳制到"内容盒完全在联合工作区内"的位置；缩放/换角色后窗口尺寸变化时也走这里重钳
+function clampPetPosition() {
+  if (!petWin || petWin.isDestroyed()) return;
+  const [w, h] = petWin.getSize();
+  const f = petContent || { fx: 0, fy: 0, fw: 1, fh: 1 };
+  const { minX, minY, maxX, maxY } = unionWorkArea();
+  const loX = minX - f.fx * w, hiX = Math.max(loX, maxX - (f.fx + f.fw) * w);
+  const loY = minY - f.fy * h, hiY = Math.max(loY, maxY - (f.fy + f.fh) * h);
+  const [x, y] = petWin.getPosition();
+  const cx = Math.round(Math.min(Math.max(x, loX), hiX));
+  const cy = Math.round(Math.min(Math.max(y, loY), hiY));
+  if (cx !== x || cy !== y) {
+    petWin.setPosition(cx, cy);
+    store.setPetPosition({ x: cx, y: cy });
+  }
+}
 
 function officialUrlOf(baseUrl) {
   try { return new URL(baseUrl).origin; } catch { return baseUrl; }
@@ -196,6 +233,7 @@ function resizePetWindow() {
   store.setPetPosition({ x: b.x, y: b.y });
   petWin.destroy();
   spawnPetWindow();
+  clampPetPosition(); // 放大后左上角不变会让窗口越出工作区，按新尺寸重钳（否则散步立即撞"墙"卡死）
 }
 
 // 切换角色：立即保存并热生效（宠物窗口收到 pet:config 后重建渲染器）
@@ -217,20 +255,27 @@ function setupIpc() {
   });
   ipcMain.handle('pet:set-position', (_e, x, y) => {
     if (!petWin) return;
-    const { screen } = require('electron');
-    const size = petWin.getSize();
+    const [w, h] = petWin.getSize();
     // 钳制到所有显示器工作区的联合边界（而不是最近单个显示器），
-    // 否则跨屏拖动时会在屏幕交界处撞"空气墙"
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    for (const d of screen.getAllDisplays()) {
-      const a = d.workArea;
-      minX = Math.min(minX, a.x); minY = Math.min(minY, a.y);
-      maxX = Math.max(maxX, a.x + a.width); maxY = Math.max(maxY, a.y + a.height);
-    }
-    const cx = Math.min(Math.max(x, minX), maxX - size[0]);
-    const cy = Math.min(Math.max(y, minY), maxY - size[1]);
-    petWin.setPosition(Math.round(cx), Math.round(cy));
-    store.setPetPosition({ x: Math.round(cx), y: Math.round(cy) });
+    // 否则跨屏拖动时会在屏幕交界处撞"空气墙"；再按内容占比收缩，
+    // 让可见形象（而非透明窗口盒）贴边即停
+    const f = petContent || { fx: 0, fy: 0, fw: 1, fh: 1 };
+    const { minX, minY, maxX, maxY } = unionWorkArea();
+    const loX = minX - f.fx * w, hiX = Math.max(loX, maxX - (f.fx + f.fw) * w);
+    const loY = minY - f.fy * h, hiY = Math.max(loY, maxY - (f.fy + f.fh) * h);
+    const cx = Math.round(Math.min(Math.max(x, loX), hiX));
+    const cy = Math.round(Math.min(Math.max(y, loY), hiY));
+    petWin.setPosition(cx, cy);
+    store.setPetPosition({ x: cx, y: cy });
+  });
+  // 渲染器量完素材内容占比后上报；到达即重钳一次当前位置（窗口可能已越界）
+  ipcMain.handle('pet:content-bounds', (_e, b) => {
+    const v = validFractions(b);
+    if (!v) return;
+    const changed = !petContent
+      || ['fx', 'fy', 'fw', 'fh'].some((k) => Math.abs(v[k] - petContent[k]) > 0.001);
+    petContent = v;
+    if (changed) clampPetPosition();
   });
   // 用量面板按内容自适应尺寸：渲染器量好自然宽高上报，这里钳到工作区内再贴合
   ipcMain.handle('usage:fit-height', (_e, h, w) => {

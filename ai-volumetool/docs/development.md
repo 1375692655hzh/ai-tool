@@ -50,12 +50,13 @@ poller.js（定时，默认5分钟）
 1. preload.js 白名单
 2. main.js `ipcMain.handle(...)` 或 `webContents.send` 的发起方
 
-主要通道速查：`pet:ready/ pet:config/ pet:menu/ pet:set-position`、`usage:toggle/ usage:close/ usage:fit-height`、`settings:get/ save`、`channels:get-for-settings/ save`、`characters:list`、`tool:launch`、`quota:get-results/ poll-now`。
+主要通道速查：`pet:ready/ pet:config/ pet:menu/ pet:set-position/ pet:content-bounds`、`usage:toggle/ usage:close/ usage:fit-height`、`settings:get/ save`、`channels:get-for-settings/ save`、`characters:list`、`tool:launch`、`quota:get-results/ poll-now`。
 
 ## 窗口尺寸的两个坑（Windows 实测）
 
-- `resizable: false` 的窗口**程序化 setSize 不可靠**（尺寸半生效）：宠物窗换尺寸走「销毁重建」（`spawnPetWindow`）
+- `resizable: false` 的窗口**程序化 setSize 不可靠**（尺寸半生效）：宠物窗换尺寸走「销毁重建」（`spawnPetWindow`），用量窗的 fit-height 则在 setSize 前后临时 `setResizable(true/false)` 解锁
 - 透明窗口里 `<video>` 不参与 alpha 合成（黑块/不显示）：视频一律隐藏解码 + canvas 逐帧画（`VideoRenderer`）
+- 宠物拖拽/散步的边界钳制按**可见内容盒**而非窗口矩形算（`pet:content-bounds` 上报实测不透明占比）——视频/精灵图四周的透明 padding 不算"身体"，否则形象还没到屏幕边就被空气墙挡住
 
 ## 角色系统
 
