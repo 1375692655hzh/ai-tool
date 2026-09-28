@@ -65,6 +65,7 @@ npm run mock     # （可选）本地 mock 渠道服务 127.0.0.1:4789，key=sk-
 | 火山引擎 Coding/Agent Plan | API | AccessKey/SecretKey | 套餐窗口剩余 |
 | OpenAI 兼容中转站 | API | URL + APIKEY | 额度已用/总额 |
 | MiniMax Token Plan | 本机 | mmx CLI 登录 | 各模型组 5小时/每周剩余 |
+| MiniMax Token Plan（Key 直查） | API | URL + APIKEY | 同上，一个 key 一档、可多开 |
 | 阿里百炼 Coding/Token Plan | 本机 | bl CLI 登录 | 5小时/每周/月度剩余 |
 | Claude Code / Pro / Max | 本机 | 订阅登录 或 用过即可 | 5小时/每周剩余（三路自适应） |
 | Codex | 本机 | 用过 Codex CLI | 额度窗口剩余 |

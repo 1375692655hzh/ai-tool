@@ -610,24 +610,10 @@ async function queryBailian() {
 // —— MiniMax：官方 mmx CLI（npm mmx-cli）查 Token Plan 额度 ——
 // 需要本机 npm i -g mmx-cli 且 mmx auth login 过（API key 或浏览器 OAuth）
 // 输出 model_remains[]：按模型组（general/video…）给当前窗口 + 每周窗口的剩余百分比
-async function queryMinimax() {
-  const v = await execCli('mmx', ['--version']);
-  if (v.err && !v.stdout.trim()) {
-    throw new Error('未找到 MiniMax CLI（mmx）。请先安装：npm install -g mmx-cli，并运行 mmx auth login 登录');
-  }
-  const r = await execCli('mmx', ['quota', 'show']);
-  const data = parseCliJson(r.stdout) || parseCliJson(r.stderr);
-  if (!data) throw new Error('MiniMax CLI 输出无法解析：' + (r.stdout || r.stderr).slice(0, 120));
-  if (data.error) {
-    const msg = String(data.error.message || '');
-    if (/No credentials/i.test(msg)) {
-      throw new Error('MiniMax CLI 未登录：请运行 mmx auth login（粘贴 API key 或浏览器登录）');
-    }
-    throw new Error('MiniMax 额度查询失败: ' + (msg || JSON.stringify(data.error)).slice(0, 100));
-  }
-  const list = Array.isArray(data.model_remains) ? data.model_remains : [];
+// model_remains[] → 窗口行（本机 mmx CLI 与 sniffer 的 API Key 直查共用同一映射）
+function minimaxWindowsFromRemains(list) {
   const windows = [];
-  for (const m of list) {
+  for (const m of (Array.isArray(list) ? list : [])) {
     if (!m || m.model_name == null) continue;
     const name = String(m.model_name);
     // 当前窗口档位由 start/end 时长决定（实测 general=5小时、video=24小时）
@@ -643,6 +629,25 @@ async function queryMinimax() {
         Math.max(0, Math.min(100, 100 - wkRem)), toResetMs(m.weekly_end_time)));
     }
   }
+  return windows;
+}
+
+async function queryMinimax() {
+  const v = await execCli('mmx', ['--version']);
+  if (v.err && !v.stdout.trim()) {
+    throw new Error('未找到 MiniMax CLI（mmx）。请先安装：npm install -g mmx-cli，并运行 mmx auth login 登录');
+  }
+  const r = await execCli('mmx', ['quota', 'show']);
+  const data = parseCliJson(r.stdout) || parseCliJson(r.stderr);
+  if (!data) throw new Error('MiniMax CLI 输出无法解析：' + (r.stdout || r.stderr).slice(0, 120));
+  if (data.error) {
+    const msg = String(data.error.message || '');
+    if (/No credentials/i.test(msg)) {
+      throw new Error('MiniMax CLI 未登录：请运行 mmx auth login（粘贴 API key 或浏览器登录）');
+    }
+    throw new Error('MiniMax 额度查询失败: ' + (msg || JSON.stringify(data.error)).slice(0, 100));
+  }
+  const windows = minimaxWindowsFromRemains(data.model_remains);
   if (!windows.length) throw new Error('MiniMax 额度响应里没有窗口数据: ' + JSON.stringify(data).slice(0, 150));
   return { kind: 'windows', windows, note: 'Token Plan' };
 }
@@ -695,4 +700,4 @@ async function queryCursor() {
   return { kind: 'windows', windows, note: tag };
 }
 
-module.exports = { queryCodex, queryClaudeCode, queryAntigravity, queryBailian, queryMinimax, queryCursor };
+module.exports = { queryCodex, queryClaudeCode, queryAntigravity, queryBailian, queryMinimax, queryCursor, minimaxWindowsFromRemains };

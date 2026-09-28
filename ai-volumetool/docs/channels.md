@@ -95,6 +95,13 @@
 - **机制**：执行 `mmx quota show` 解析各模型组的 5小时/每周窗口剩余
 - **常见报错**：`No credentials found` → 先 `mmx auth login`；「未找到 mmx」→ 全局安装 mmx-cli
 
+### MiniMax Token Plan（API Key 直查）
+
+- **前置条件**：只要 Token Plan 的 API Key（`sk-cp-...`），无需安装 mmx CLI
+- **机制**：`GET {base}/v1/token_plan/remains`（Bearer key），与本机 mmx CLI 同一份数据；**一个 key 一档渠道、可多开**（多账号/多套餐各加一条，互不干扰）
+- **配置**：URL 填 `https://api.minimaxi.com`（国际站 `https://api.minimax.io`），APIKEY 填 Token Plan 的 key
+- **注意**：mmx CLI 只能记住一份登录态，要多开时用这个模板，别用本机 CLI 模板
+
 ### 阿里百炼 Coding / Token Plan（本机 bl CLI）
 
 - **前置条件**：`npm install -g bailian-cli` 且 `bl auth login --console`（浏览器登录控制台）

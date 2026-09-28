@@ -14,6 +14,7 @@
     'glm-team-legacy': { label: 'GLM 老版团队 API（不支持查询）', fields: [], hint: '智谱官方未开放老版团队的额度查询接口（已实测确认），此渠道会显示说明。想看百分比需换用新版 Coding Plan 的 Key' },
     deepseek:          { label: 'DeepSeek 官方', fields: ['baseUrl', 'override'], url: 'https://api.deepseek.com' },
     minimax:           { label: 'MiniMax Token Plan（本机 mmx CLI）', fields: [], local: '自动调用官方 MiniMax CLI 查询 Token Plan 剩余额度（按模型组的 5小时/每周窗口）。前提：npm install -g mmx-cli 且运行过 mmx auth login（粘贴 API key 或浏览器登录）。官网地址建议填 https://platform.minimaxi.com' },
+    'minimax-key':     { label: 'MiniMax Token Plan（API Key 直查）', fields: ['baseUrl'], url: 'https://api.minimaxi.com', hint: '直接用 Token Plan 的 API Key 查剩余额度（按模型组的 5小时/每周窗口），一个 key 一档渠道、可多开，无需安装 mmx CLI；国际站填 https://api.minimax.io' },
     volcano:           { label: '火山引擎 Coding/Agent Plan', fields: ['baseUrl', 'accessKey'], url: 'https://ark.cn-beijing.volces.com/api/plan/v3', hint: '需要 IAM 密钥管理里的 AccessKey/SecretKey（子账号授 ArkReadOnlyAccess 只读权限即可）；推理 API Key 查不了套餐用量' },
     'openai-relay':    { label: 'OpenAI 兼容中转站', fields: ['baseUrl'], hint: 'new-api / one-api 等中转站的计费接口（额度=已用/总额）' },
     bailian:          { label: '阿里百炼 Coding/Token Plan（本机 bl CLI）', fields: [], local: '自动调用官方百炼 CLI 查询 Coding Plan / Token Plan 额度。前提：npm install -g bailian-cli 且运行过 bl auth login --console（浏览器登录）。官网地址建议填控制台 https://bailian.console.aliyun.com/?tab=dashboard' },

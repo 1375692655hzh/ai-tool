@@ -249,6 +249,19 @@ async function queryVolcanoOpenapi(base, ch) {
   return { kind: 'windows', windows };
 }
 
+// —— MiniMax Token Plan（API Key 直查） ——
+// 官方接口 GET {base}/v1/token_plan/remains（Bearer key），与本机 mmx CLI quota show 同一份数据；
+// 按 key 查各自的额度，一个 Token Plan key 一档渠道，可多开
+async function queryMinimaxKey(base, ch) {
+  const data = await fetchJson(`${normalizeBase(base)}/v1/token_plan/remains`, ch.apiKey);
+  if (data && data.base_resp && Number(data.base_resp.status_code) !== 0) {
+    throw new Error('MiniMax 接口错误: ' + (data.base_resp.status_msg || data.base_resp.status_code));
+  }
+  const windows = localClis.minimaxWindowsFromRemains(data && data.model_remains);
+  if (!windows.length) throw new Error('MiniMax 额度响应里没有窗口数据: ' + JSON.stringify(data).slice(0, 150));
+  return { kind: 'windows', windows, note: 'Token Plan' };
+}
+
 // —— 中转站计费 / 余额 ——
 
 async function queryOpenAiBilling(base, ch) {
@@ -293,6 +306,7 @@ const QUERIERS = {
   'openai-billing': queryOpenAiBilling,
   'deepseek-balance': queryDeepSeekBalance,
   custom: queryCustom,
+  'minimax-key': queryMinimaxKey,
   // 本机 CLI（无需 URL/KEY）
   'local-codex': () => localClis.queryCodex(),
   'local-claude': () => localClis.queryClaudeCode(),
@@ -317,6 +331,7 @@ const VENDOR_TYPES = {
   'glm-team-legacy': { type: 'glm-team-legacy' },
   deepseek: { type: 'deepseek-balance' },
   minimax: { type: 'local-minimax', local: true },
+  'minimax-key': { type: 'minimax-key' },
   volcano: { type: 'volcano-openapi' },
   'openai-relay': { type: 'openai-billing' },
   'claude-code': { type: 'local-claude', local: true },
@@ -330,7 +345,7 @@ const VENDOR_TYPES = {
 const HOST_HINTS = [
   { match: /bigmodel\.cn|z\.ai/i, first: 'glm-coding' },
   { match: /kimi\.com|moonshot/i, first: 'kimi-coding' },
-  { match: /minimaxi\.com|minimax\.io/i, failHint: 'MiniMax 的套餐额度请用「MiniMax Token Plan（本机 mmx CLI）」模板：需安装官方 mmx-cli 并 mmx auth login 登录' },
+  { match: /minimaxi\.com|minimax\.io/i, first: 'minimax-key', failHint: 'MiniMax 的套餐额度用「MiniMax Token Plan（API Key 直查）」模板：填 API Key 即可，一个 Token Plan key 一档渠道' },
   { match: /dashscope\.aliyuncs|bailian/i, failHint: '阿里百炼的套餐额度请用「阿里百炼 Coding/Token Plan（本机 bl CLI）」模板：需安装官方 bailian-cli 并 bl auth login --console 登录' },
   { match: /volces\.com|volcengine/i, first: 'volcano-openapi', failHint: '火山引擎需要在设置里填 AccessKey/SecretKey（IAM 只读子账号即可），推理 API Key 查不了用量' },
 ];
