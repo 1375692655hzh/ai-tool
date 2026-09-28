@@ -611,11 +611,13 @@ async function queryBailian() {
 // 需要本机 npm i -g mmx-cli 且 mmx auth login 过（API key 或浏览器 OAuth）
 // 输出 model_remains[]：按模型组（general/video…）给当前窗口 + 每周窗口的剩余百分比
 // model_remains[] → 窗口行（本机 mmx CLI 与 sniffer 的 API Key 直查共用同一映射）
+// 只显示 general 模型组：video 组用不到，不展示（查询仍走同一接口，不过滤请求）
 function minimaxWindowsFromRemains(list) {
   const windows = [];
   for (const m of (Array.isArray(list) ? list : [])) {
     if (!m || m.model_name == null) continue;
     const name = String(m.model_name);
+    if (name === 'video') continue;
     // 当前窗口档位由 start/end 时长决定（实测 general=5小时、video=24小时）
     const durMin = Math.round((Number(m.end_time) - Number(m.start_time)) / 60000);
     const intRem = Number(m.current_interval_remaining_percent);
